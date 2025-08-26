@@ -1,63 +1,36 @@
+// split-json.js
 import fs from "fs";
 
-// Load the big JSON
-const cards = JSON.parse(fs.readFileSync("./cards.json", "utf-8"));
+// Load the big JSON file
+const cards = JSON.parse(fs.readFileSync("cards.json", "utf8"));
 
-// ----------------------
-// 1. Core dataset (lightweight)
-// ----------------------
-const cardsCore = cards.map(c => ({
-  id: c.id,
-  name: c.name,
-  type: c.type,
-  desc: c.desc,
-  image_url: c.image_url,
-}));
+// Buckets for A-Z and 0-9
+const buckets = {};
 
-// ----------------------
-// 2. Lookup by ID (fast access)
-// ----------------------
-const cardsById = {};
-cards.forEach(c => {
-  cardsById[c.id] = {
-    name: c.name,
-    type: c.type,
-    desc: c.desc,
-    image_url: c.image_url,
-  };
+// Initialize buckets
+for (let i = 65; i <= 90; i++) {
+  buckets[String.fromCharCode(i)] = [];
+}
+buckets["0-9"] = [];
+
+// Put each card into the right bucket
+cards.forEach((c) => {
+  const firstChar = String(c.name).charAt(0).toUpperCase();
+  if (/[0-9]/.test(firstChar)) {
+    buckets["0-9"].push(c);
+  } else if (/[A-Z]/.test(firstChar)) {
+    buckets[firstChar].push(c);
+  } else {
+    // fallback in case of weird characters
+    buckets["0-9"].push(c);
+  }
 });
 
-// ----------------------
-// 3. Search index (lowercased for speed)
-// ----------------------
-const searchIndex = cards.map(c => ({
-  id: c.id,
-  name: typeof c.name === "string" ? c.name.toLowerCase() : "",
-  desc: typeof c.desc === "string" ? c.desc.toLowerCase() : "",
-}));
+// Save each bucket into its own JSON file
+Object.keys(buckets).forEach((key) => {
+  const filename = `${key}.json`;
+  fs.writeFileSync(filename, JSON.stringify(buckets[key], null, 2));
+  console.log(`Created ${filename} with ${buckets[key].length} cards`);
+});
 
-
-// ----------------------
-// 4. Split by type
-// ----------------------
-const monsters = cards.filter(c => c.type.toLowerCase().includes("monster"));
-const spells = cards.filter(c => c.type.toLowerCase().includes("spell"));
-const traps = cards.filter(c => c.type.toLowerCase().includes("trap"));
-
-// ----------------------
-// Write outputs
-// ----------------------
-fs.writeFileSync("./cards-core.json", JSON.stringify(cardsCore, null, 2));
-fs.writeFileSync("./cards-by-id.json", JSON.stringify(cardsById, null, 2));
-fs.writeFileSync("./search-index.json", JSON.stringify(searchIndex, null, 2));
-fs.writeFileSync("./monsters.json", JSON.stringify(monsters, null, 2));
-fs.writeFileSync("./spells.json", JSON.stringify(spells, null, 2));
-fs.writeFileSync("./traps.json", JSON.stringify(traps, null, 2));
-
-console.log("✅ Generated:");
-console.log("  - cards-core.json");
-console.log("  - cards-by-id.json");
-console.log("  - search-index.json");
-console.log("  - monsters.json");
-console.log("  - spells.json");
-console.log("  - traps.json");
+console.log("✅ Split complete!");
